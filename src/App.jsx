@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 // ─── TOPIC POOL ────────────────────────────────────────────────────────────
 // Each entry: [real word, imposter word]. Imposter word is similar but distinct.
 const TOPIC_POOL = [
-  ["Pizza", "Pancake"],
+  ["Minecraft", "Roblox"],
   ["Lion", "Tiger"],
   ["Guitar", "Violin"],
   ["Beach", "Desert"],
