@@ -49,6 +49,59 @@ const HANDOFF_SECONDS = 4;
 const DISCUSSION_SECONDS = 60;
 const TOTAL_ROUNDS = 4;
 
+// ─── AUDIO ────────────────────────────────────────────────────────────────
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      return null;
+    }
+  }
+  // browsers suspend audio until a user gesture; resume if needed
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTick(urgent = false) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  // urgent ticks are higher pitch and louder
+  osc.frequency.value = urgent ? 880 : 600;
+  osc.type = "square";
+
+  const now = ctx.currentTime;
+  const peak = urgent ? 0.15 : 0.08;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+  osc.start(now);
+  osc.stop(now + 0.06);
+}
+
+function playFinalBeep() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.value = 220;
+  osc.type = "sawtooth";
+  const now = ctx.currentTime;
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  osc.start(now);
+  osc.stop(now + 0.4);
+}
+
 export default function App() {
   const [phase, setPhase] = useState(PHASES.SETUP);
   const [playerCount, setPlayerCount] = useState(4);
@@ -525,8 +578,13 @@ function DrawingScreen({ playerNumber, round, seconds, onComplete }) {
 
   useEffect(() => {
     if (secondsLeft <= 0) {
+      playFinalBeep();
       handleSubmit();
       return;
+    }
+    // tick on every second; urgent (higher pitch) in final 5
+    if (secondsLeft <= seconds) {
+      playTick(secondsLeft <= 5);
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
@@ -739,7 +797,13 @@ function DiscussionScreen({ seconds, round, totalRounds, onEnd, allDrawings }) {
   }
 
   useEffect(() => {
-    if (secondsLeft <= 0) return;
+    if (secondsLeft <= 0) {
+      playFinalBeep();
+      return;
+    }
+    if (secondsLeft <= 10) {
+      playTick(secondsLeft <= 5);
+    }
     const t = setTimeout(() => setSecondsLeft(secondsLeft - 1), 1000);
     return () => clearTimeout(t);
   }, [secondsLeft]);
