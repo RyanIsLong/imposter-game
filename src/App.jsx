@@ -42,7 +42,7 @@ const PHASES = {
   RESULTS: "results",
 };
 
-const DRAW_SECONDS = 30;
+const DRAW_SECONDS = [15, 10, 5, 3];
 const HANDOFF_SECONDS = 4;
 const DISCUSSION_SECONDS = 60;
 const TOTAL_ROUNDS = 4;
@@ -261,6 +261,7 @@ export default function App() {
             playerName={getName(names, currentDrawer)}
             round={round}
             totalRounds={TOTAL_ROUNDS}
+            drawSeconds={DRAW_SECONDS[round - 1]}
             onReady={() => setPhase(PHASES.DRAWING)}
           />
         )}
@@ -269,7 +270,7 @@ export default function App() {
           <DrawingScreen
             playerName={getName(names, currentDrawer)}
             round={round}
-            seconds={DRAW_SECONDS}
+            seconds={DRAW_SECONDS[round - 1]}
             onComplete={onDrawingComplete}
           />
         )}
@@ -663,7 +664,7 @@ function RevealScreen({ playerCount, names, revealed, openRevealCard, showReveal
 }
 
 // ─── HANDOFF ──────────────────────────────────────────────────────────────
-function HandoffScreen({ playerName, round, totalRounds, onReady }) {
+function HandoffScreen({ playerName, round, totalRounds, drawSeconds, onReady }) {
   const [secondsLeft, setSecondsLeft] = useState(HANDOFF_SECONDS);
 
   useEffect(() => {
@@ -674,8 +675,11 @@ function HandoffScreen({ playerName, round, totalRounds, onReady }) {
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
-      <div className="text-xs tracking-[0.3em] text-stone-500 mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="text-xs tracking-[0.3em] text-stone-500 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
         ROUND {round} / {totalRounds}
+      </div>
+      <div className="text-xs tracking-[0.3em] text-pink-300 mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {drawSeconds}s TO DRAW
       </div>
       <div className="text-stone-400 mb-2 text-sm">Pass the phone to</div>
       <div
