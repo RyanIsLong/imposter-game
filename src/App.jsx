@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 // ─── TOPIC POOL ────────────────────────────────────────────────────────────
-// Each entry: [real word, imposter word]. Imposter word is similar but distinct.
 const TOPIC_POOL = [
-  ["Minecraft", "Roblox"],
+  ["Pizza", "Pancake"],
   ["Lion", "Tiger"],
   ["Guitar", "Violin"],
   ["Beach", "Desert"],
@@ -30,10 +29,9 @@ const TOPIC_POOL = [
   ["Tornado", "Hurricane"],
 ];
 
-// ─── PHASES ────────────────────────────────────────────────────────────────
-// setup → reveal → handoff → drawing → roundEnd → discussion → vote → results
 const PHASES = {
   SETUP: "setup",
+  NAMES: "names",
   REVEAL: "reveal",
   HANDOFF: "handoff",
   DRAWING: "drawing",
@@ -59,7 +57,6 @@ function getAudioCtx() {
       return null;
     }
   }
-  // browsers suspend audio until a user gesture; resume if needed
   if (audioCtx.state === "suspended") audioCtx.resume();
   return audioCtx;
 }
@@ -71,17 +68,13 @@ function playTick(urgent = false) {
   const gain = ctx.createGain();
   osc.connect(gain);
   gain.connect(ctx.destination);
-
-  // urgent ticks are higher pitch and louder
   osc.frequency.value = urgent ? 880 : 600;
   osc.type = "square";
-
   const now = ctx.currentTime;
   const peak = urgent ? 0.15 : 0.08;
   gain.gain.setValueAtTime(0, now);
   gain.gain.linearRampToValueAtTime(peak, now + 0.005);
   gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
   osc.start(now);
   osc.stop(now + 0.06);
 }
@@ -102,26 +95,37 @@ function playFinalBeep() {
   osc.stop(now + 0.4);
 }
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────
+function getName(names, idx) {
+  const n = names && names[idx];
+  return (n && n.trim()) || `Player ${idx + 1}`;
+}
+
 export default function App() {
   const [phase, setPhase] = useState(PHASES.SETUP);
   const [playerCount, setPlayerCount] = useState(4);
-  const [topics, setTopics] = useState([]); // [[real, imposter], ...] one per round
+  const [names, setNames] = useState([]);
+  const [topics, setTopics] = useState([]);
   const [imposterIdx, setImposterIdx] = useState(null);
-  const [revealed, setRevealed] = useState([]); // booleans per player
+  const [revealed, setRevealed] = useState([]);
   const [currentDrawer, setCurrentDrawer] = useState(0);
   const [round, setRound] = useState(1);
-  const [drawings, setDrawings] = useState([]); // {round, player, dataUrl}[]
+  const [drawings, setDrawings] = useState([]);
   const [galleryIdx, setGalleryIdx] = useState(0);
-  const [votes, setVotes] = useState({}); // {voterIdx: votedForIdx}
-  const [revealStep, setRevealStep] = useState("locked"); // locked | shown
+  const [votes, setVotes] = useState({});
+  const [revealStep, setRevealStep] = useState("locked");
   const [showRevealCard, setShowRevealCard] = useState(false);
 
-  // ─── START GAME ─────────────────────────────────────────────────────────
-  function startGame() {
-    // Pick TOTAL_ROUNDS distinct topics in a random order
+  function goToNames() {
+    setNames(Array(playerCount).fill(""));
+    setPhase(PHASES.NAMES);
+  }
+
+  function startGame(finalNames) {
     const shuffled = [...TOPIC_POOL].sort(() => Math.random() - 0.5);
     const roundTopics = shuffled.slice(0, TOTAL_ROUNDS);
     const imp = Math.floor(Math.random() * playerCount);
+    setNames(finalNames);
     setTopics(roundTopics);
     setImposterIdx(imp);
     setRevealed(Array(playerCount).fill(false));
@@ -134,6 +138,7 @@ export default function App() {
 
   function resetAll() {
     setPhase(PHASES.SETUP);
+    setNames([]);
     setTopics([]);
     setImposterIdx(null);
     setRevealed([]);
@@ -144,7 +149,6 @@ export default function App() {
     setShowRevealCard(false);
   }
 
-  // ─── REVEAL FLOW ────────────────────────────────────────────────────────
   function openRevealCard(idx) {
     if (revealed[idx]) return;
     setShowRevealCard(idx);
@@ -163,13 +167,11 @@ export default function App() {
     setShowRevealCard(false);
     setRevealStep("locked");
     if (newRevealed.every(Boolean)) {
-      // all revealed — go to handoff for player 1
       setCurrentDrawer(0);
       setPhase(PHASES.HANDOFF);
     }
   }
 
-  // ─── DRAWING FLOW ───────────────────────────────────────────────────────
   function onDrawingComplete(dataUrl) {
     setDrawings((prev) => [
       ...prev,
@@ -179,7 +181,6 @@ export default function App() {
       setCurrentDrawer(currentDrawer + 1);
       setPhase(PHASES.HANDOFF);
     } else {
-      // round complete
       setPhase(PHASES.ROUND_END);
     }
   }
@@ -204,7 +205,6 @@ export default function App() {
     } else {
       setRound(round + 1);
       setCurrentDrawer(0);
-      // reset reveal state so each player must peek at the new word
       setRevealed(Array(playerCount).fill(false));
       setPhase(PHASES.REVEAL);
     }
@@ -218,10 +218,8 @@ export default function App() {
     }
   }
 
-  // ─── RENDER ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen w-full text-stone-100 relative overflow-hidden" style={{ fontFamily: "'DM Sans', system-ui, sans-serif", backgroundColor: "#0c0a14" }}>
-      {/* atmospheric background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at top left, rgba(244, 114, 182, 0.15), transparent 50%), radial-gradient(ellipse at bottom right, rgba(99, 102, 241, 0.18), transparent 55%)" }} />
         <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")" }} />
@@ -230,11 +228,21 @@ export default function App() {
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500;700&family=Press+Start+2P&display=swap" />
 
       <div className="relative z-10 max-w-2xl mx-auto px-5 py-8">
-        {phase === PHASES.SETUP && <SetupScreen playerCount={playerCount} setPlayerCount={setPlayerCount} startGame={startGame} />}
+        {phase === PHASES.SETUP && <SetupScreen playerCount={playerCount} setPlayerCount={setPlayerCount} startGame={goToNames} />}
+
+        {phase === PHASES.NAMES && (
+          <NamesScreen
+            playerCount={playerCount}
+            initialNames={names}
+            onBack={() => setPhase(PHASES.SETUP)}
+            onStart={startGame}
+          />
+        )}
 
         {phase === PHASES.REVEAL && (
           <RevealScreen
             playerCount={playerCount}
+            names={names}
             revealed={revealed}
             openRevealCard={openRevealCard}
             showRevealCard={showRevealCard}
@@ -250,7 +258,7 @@ export default function App() {
 
         {phase === PHASES.HANDOFF && (
           <HandoffScreen
-            playerNumber={currentDrawer + 1}
+            playerName={getName(names, currentDrawer)}
             round={round}
             totalRounds={TOTAL_ROUNDS}
             onReady={() => setPhase(PHASES.DRAWING)}
@@ -259,7 +267,7 @@ export default function App() {
 
         {phase === PHASES.DRAWING && (
           <DrawingScreen
-            playerNumber={currentDrawer + 1}
+            playerName={getName(names, currentDrawer)}
             round={round}
             seconds={DRAW_SECONDS}
             onComplete={onDrawingComplete}
@@ -292,6 +300,7 @@ export default function App() {
         {phase === PHASES.VOTE && (
           <VoteScreen
             playerCount={playerCount}
+            names={names}
             votes={votes}
             castVote={castVote}
           />
@@ -302,6 +311,7 @@ export default function App() {
             votes={votes}
             imposterIdx={imposterIdx}
             playerCount={playerCount}
+            names={names}
             topics={topics}
             allDrawings={drawings}
             onRestart={resetAll}
@@ -317,11 +327,11 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
   return (
     <div className="pt-8 pb-12">
       <div className="mb-12 text-center">
-        <div className="inline-block mb-3 px-3 py-1 border border-pink-400/40 rounded-full text-pink-300 text-xs tracking-[0.3em]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        <div className="inline-block mb-4 px-3 py-2 border border-pink-400/40 rounded text-pink-300" style={{ fontFamily: "'Press Start 2P', monospace", fontSize: "0.55rem", letterSpacing: "0.15em" }}>
           PASS · DRAW · DECEIVE
         </div>
         <h1
-          className="leading-[1.1]"
+          className="leading-[1.3]"
           style={{
             fontFamily: "'Press Start 2P', monospace",
             fontSize: "clamp(2rem, 9vw, 4rem)",
@@ -334,7 +344,7 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
           <br />
           <span style={{ color: "#fce7f3" }}>IMPOSTER</span>
         </h1>
-        <p className="text-stone-400 mt-4 text-sm leading-relaxed max-w-sm mx-auto">
+        <p className="text-stone-400 mt-6 text-sm leading-relaxed max-w-sm mx-auto">
           One of you draws something <em>almost</em> right. The rest of you have to figure out who.
         </p>
       </div>
@@ -372,7 +382,7 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
           THE RULES
         </div>
         <ol className="space-y-2 list-decimal list-inside marker:text-pink-400/60">
-          <li>Decide who is Player 1, 2, 3…</li>
+          <li>Add player names (or skip).</li>
           <li>Each player secretly reveals their card.</li>
           <li>Pass the phone, draw your word, repeat.</li>
           <li>{TOTAL_ROUNDS} rounds. Then vote on the imposter.</li>
@@ -390,14 +400,144 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
   );
 }
 
+// ─── NAMES ────────────────────────────────────────────────────────────────
+function NamesScreen({ playerCount, initialNames, onBack, onStart }) {
+  const [vals, setVals] = useState(
+    initialNames.length === playerCount ? initialNames : Array(playerCount).fill("")
+  );
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    if (inputRefs.current[0]) inputRefs.current[0].focus();
+  }, []);
+
+  function update(i, value) {
+    const next = [...vals];
+    next[i] = value.slice(0, 14);
+    setVals(next);
+  }
+
+  function focusNext(i) {
+    if (i + 1 < playerCount && inputRefs.current[i + 1]) {
+      inputRefs.current[i + 1].focus();
+    } else {
+      handleStart();
+    }
+  }
+
+  function handleStart() {
+    onStart(vals);
+  }
+
+  const filledCount = vals.filter((v) => v.trim()).length;
+
+  return (
+    <div className="pt-6 pb-12">
+      <div className="text-center mb-8">
+        <div className="text-xs text-pink-300 tracking-[0.3em] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          STEP 02 · WHO'S PLAYING?
+        </div>
+        <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(2.5rem, 8vw, 3.5rem)", lineHeight: 1 }}>
+          ENTER NAMES
+        </h2>
+        <p className="text-stone-400 text-sm mt-3 max-w-sm mx-auto">
+          Optional — leave blank to use Player 1, 2, 3…
+        </p>
+      </div>
+
+      <div className="space-y-3 mb-6">
+        {Array.from({ length: playerCount }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus-within:border-pink-400/60 transition"
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{
+                background: vals[i].trim()
+                  ? "linear-gradient(135deg, #f472b6 0%, #c084fc 100%)"
+                  : "rgba(255,255,255,0.05)",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: "1.4rem",
+                  color: vals[i].trim() ? "#0c0a14" : "#a1a1aa",
+                  lineHeight: 1,
+                }}
+              >
+                {i + 1}
+              </span>
+            </div>
+            <input
+              ref={(el) => (inputRefs.current[i] = el)}
+              type="text"
+              value={vals[i]}
+              onChange={(e) => update(i, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  focusNext(i);
+                }
+              }}
+              placeholder={`Player ${i + 1}`}
+              maxLength={14}
+              autoCorrect="off"
+              autoCapitalize="words"
+              spellCheck="false"
+              className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-stone-500 text-base min-w-0"
+              style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}
+            />
+            {vals[i].trim() && (
+              <button
+                onClick={() => update(i, "")}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-stone-500 text-sm transition flex-shrink-0"
+                aria-label="Clear"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="text-center text-xs text-stone-500 mb-6" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {filledCount === 0
+          ? "USING DEFAULT NAMES"
+          : `${filledCount} / ${playerCount} NAMED`}
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onBack}
+          className="px-6 py-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition active:scale-[0.98]"
+          style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.1rem", letterSpacing: "0.15em" }}
+        >
+          ← BACK
+        </button>
+        <button
+          onClick={handleStart}
+          className="flex-1 py-4 rounded-full text-black font-bold tracking-wider active:scale-[0.98] transition shadow-lg shadow-pink-500/30"
+          style={{ background: "linear-gradient(135deg, #f472b6 0%, #c084fc 100%)", fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.3rem", letterSpacing: "0.15em" }}
+        >
+          START GAME →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── REVEAL ───────────────────────────────────────────────────────────────
-function RevealScreen({ playerCount, revealed, openRevealCard, showRevealCard, revealStep, unlockReveal, closeReveal, isImposter, topic, round, totalRounds }) {
+function RevealScreen({ playerCount, names, revealed, openRevealCard, showRevealCard, revealStep, unlockReveal, closeReveal, isImposter, topic, round, totalRounds }) {
   const isFirstRound = round === 1;
+  const currentName = showRevealCard !== false ? getName(names, showRevealCard) : "";
+
   return (
     <div className="pt-6 pb-8">
       <div className="text-center mb-8">
         <div className="text-xs text-pink-300 tracking-[0.3em] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {isFirstRound ? "STEP 01 · SECRET REVEAL" : `ROUND ${round} / ${totalRounds} · NEW WORD`}
+          {isFirstRound ? "STEP 03 · SECRET REVEAL" : `ROUND ${round} / ${totalRounds} · NEW WORD`}
         </div>
         <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(2.5rem, 8vw, 3.5rem)", lineHeight: 1 }}>
           TAP YOUR CARD
@@ -421,38 +561,45 @@ function RevealScreen({ playerCount, revealed, openRevealCard, showRevealCard, r
                 : "bg-white/5 border-white/15 hover:border-pink-400/60 hover:bg-white/10"
             }`}
           >
-            {/* Card pattern */}
             {!revealed[i] && (
               <div className="absolute inset-0" style={{
                 backgroundImage: "repeating-linear-gradient(45deg, rgba(244, 114, 182, 0.06) 0, rgba(244, 114, 182, 0.06) 2px, transparent 2px, transparent 8px)",
               }} />
             )}
-            <div className="relative h-full flex flex-col items-center justify-center">
-              <div className="text-xs tracking-[0.25em] text-stone-500 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {revealed[i] ? "SEEN" : "PLAYER"}
+            <div className="relative h-full flex flex-col items-center justify-center px-2">
+              <div className="text-xs tracking-[0.25em] text-stone-500 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {revealed[i] ? "SEEN" : `#${i + 1}`}
               </div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "3.5rem", lineHeight: 1, color: revealed[i] ? "#34d399" : "#fff" }}>
-                {revealed[i] ? "✓" : i + 1}
+              <div
+                style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: revealed[i] ? "3.5rem" : "1.6rem",
+                  lineHeight: 1.05,
+                  color: revealed[i] ? "#34d399" : "#fff",
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                }}
+              >
+                {revealed[i] ? "✓" : getName(names, i).toUpperCase()}
               </div>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Reveal modal */}
       {showRevealCard !== false && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ backgroundColor: "rgba(8, 6, 18, 0.92)", backdropFilter: "blur(8px)" }}>
           <div className="w-full max-w-sm">
             {revealStep === "locked" ? (
               <div className="text-center">
                 <div className="text-xs text-pink-300 tracking-[0.3em] mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  PLAYER {showRevealCard + 1}
+                  {currentName.toUpperCase()}'S TURN
                 </div>
                 <h3 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "2.5rem", lineHeight: 1 }} className="mb-4">
                   ALONE?
                 </h3>
                 <p className="text-stone-300 mb-8 text-sm">
-                  Make sure no one else can see your screen. Only Player {showRevealCard + 1} should be looking.
+                  Make sure no one else can see your screen. Only {currentName} should be looking.
                 </p>
                 <button
                   onClick={unlockReveal}
@@ -516,7 +663,7 @@ function RevealScreen({ playerCount, revealed, openRevealCard, showRevealCard, r
 }
 
 // ─── HANDOFF ──────────────────────────────────────────────────────────────
-function HandoffScreen({ playerNumber, round, totalRounds, onReady }) {
+function HandoffScreen({ playerName, round, totalRounds, onReady }) {
   const [secondsLeft, setSecondsLeft] = useState(HANDOFF_SECONDS);
 
   useEffect(() => {
@@ -526,16 +673,23 @@ function HandoffScreen({ playerNumber, round, totalRounds, onReady }) {
   }, [secondsLeft]);
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
       <div className="text-xs tracking-[0.3em] text-stone-500 mb-4" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
         ROUND {round} / {totalRounds}
       </div>
       <div className="text-stone-400 mb-2 text-sm">Pass the phone to</div>
-      <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(5rem, 20vw, 8rem)", lineHeight: 0.9 }} className="mb-2">
-        PLAYER
-      </h2>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(8rem, 30vw, 12rem)", lineHeight: 1, background: "linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-        {playerNumber}
+      <div
+        style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: "clamp(4rem, 18vw, 8rem)",
+          lineHeight: 0.95,
+          background: "linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          wordBreak: "break-word",
+        }}
+      >
+        {playerName.toUpperCase()}
       </div>
 
       <button
@@ -559,7 +713,7 @@ function HandoffScreen({ playerNumber, round, totalRounds, onReady }) {
 }
 
 // ─── DRAWING ──────────────────────────────────────────────────────────────
-function DrawingScreen({ playerNumber, round, seconds, onComplete }) {
+function DrawingScreen({ playerName, round, seconds, onComplete }) {
   const canvasRef = useRef(null);
   const [secondsLeft, setSecondsLeft] = useState(seconds);
   const [color, setColor] = useState("#ffffff");
@@ -589,7 +743,6 @@ function DrawingScreen({ playerNumber, round, seconds, onComplete }) {
       handleSubmit();
       return;
     }
-    // tick on every second; urgent (higher pitch) in final 5
     if (secondsLeft <= seconds) {
       playTick(secondsLeft <= 5);
     }
@@ -651,11 +804,11 @@ function DrawingScreen({ playerNumber, round, seconds, onComplete }) {
 
   return (
     <div className="pt-2 pb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs tracking-[0.25em] text-stone-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          P{playerNumber} · R{round}
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="text-xs tracking-[0.25em] text-stone-400 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {playerName.toUpperCase()} · R{round}
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace" }} className={`text-2xl font-bold ${secondsLeft <= 5 ? "text-red-400 animate-pulse" : "text-white"}`}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace" }} className={`text-2xl font-bold flex-shrink-0 ${secondsLeft <= 5 ? "text-red-400 animate-pulse" : "text-white"}`}>
           {secondsLeft}s
         </div>
       </div>
@@ -750,7 +903,6 @@ function RoundEndScreen({ round, onShowGallery }) {
 
 // ─── GALLERY ──────────────────────────────────────────────────────────────
 function GalleryScreen({ drawings, idx, round, onNext }) {
-  // Shuffle order so player order is hidden
   const shuffledRef = useRef(null);
   if (!shuffledRef.current || shuffledRef.current.length !== drawings.length) {
     shuffledRef.current = [...drawings].sort(() => Math.random() - 0.5);
@@ -797,7 +949,6 @@ function GalleryScreen({ drawings, idx, round, onNext }) {
 function DiscussionScreen({ seconds, round, totalRounds, onEnd, allDrawings }) {
   const [secondsLeft, setSecondsLeft] = useState(seconds);
   const roundDrawings = allDrawings.filter((d) => d.round === round);
-  // shuffled order
   const shuffledRef = useRef(null);
   if (!shuffledRef.current || shuffledRef.current.length !== roundDrawings.length) {
     shuffledRef.current = [...roundDrawings].sort(() => Math.random() - 0.5);
@@ -859,7 +1010,7 @@ function DiscussionScreen({ seconds, round, totalRounds, onEnd, allDrawings }) {
 }
 
 // ─── VOTE ─────────────────────────────────────────────────────────────────
-function VoteScreen({ playerCount, votes, castVote }) {
+function VoteScreen({ playerCount, names, votes, castVote }) {
   const [currentVoter, setCurrentVoter] = useState(0);
   const [showHandoff, setShowHandoff] = useState(true);
 
@@ -871,18 +1022,27 @@ function VoteScreen({ playerCount, votes, castVote }) {
     }
   }
 
+  const currentName = getName(names, currentVoter);
+
   if (showHandoff && !votes[currentVoter]) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center">
+      <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
         <div className="text-xs tracking-[0.3em] text-pink-300 mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
           FINAL VOTE
         </div>
         <div className="text-stone-400 mb-2 text-sm">Pass to</div>
-        <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(5rem, 20vw, 7rem)", lineHeight: 0.9 }} className="mb-2">
-          PLAYER
-        </h2>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(7rem, 25vw, 10rem)", lineHeight: 1, background: "linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-          {currentVoter + 1}
+        <div
+          style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: "clamp(4rem, 18vw, 7rem)",
+            lineHeight: 0.95,
+            background: "linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            wordBreak: "break-word",
+          }}
+        >
+          {currentName.toUpperCase()}
         </div>
         <p className="text-stone-400 mt-6 mb-8 max-w-sm text-sm">
           Cast your vote in private. Who do you think the imposter is?
@@ -902,7 +1062,7 @@ function VoteScreen({ playerCount, votes, castVote }) {
     <div className="pt-6 pb-8">
       <div className="text-center mb-6">
         <div className="text-xs tracking-[0.3em] text-pink-300 mb-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          PLAYER {currentVoter + 1} VOTING
+          {currentName.toUpperCase()} VOTING
         </div>
         <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(2.5rem, 8vw, 3rem)", lineHeight: 1 }}>
           WHO IS THE
@@ -923,12 +1083,20 @@ function VoteScreen({ playerCount, votes, castVote }) {
                 : "bg-white/5 border-white/15 hover:border-red-400/60 hover:bg-red-500/10"
             }`}
           >
-            <div className="h-full flex flex-col items-center justify-center">
+            <div className="h-full flex flex-col items-center justify-center px-2">
               <div className="text-xs tracking-[0.25em] text-stone-500 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {i === currentVoter ? "YOU" : "PLAYER"}
+                {i === currentVoter ? "YOU" : `#${i + 1}`}
               </div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "3.5rem", lineHeight: 1 }}>
-                {i + 1}
+              <div
+                style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: "1.6rem",
+                  lineHeight: 1.05,
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                }}
+              >
+                {getName(names, i).toUpperCase()}
               </div>
             </div>
           </button>
@@ -939,8 +1107,7 @@ function VoteScreen({ playerCount, votes, castVote }) {
 }
 
 // ─── RESULTS ──────────────────────────────────────────────────────────────
-function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, onRestart }) {
-  // Tally votes
+function ResultsScreen({ votes, imposterIdx, playerCount, names, topics, allDrawings, onRestart }) {
   const tally = {};
   Object.values(votes).forEach((v) => {
     tally[v] = (tally[v] || 0) + 1;
@@ -951,6 +1118,7 @@ function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, o
     .map(([k]) => parseInt(k));
   const accused = accusedSet[0];
   const groupWon = accusedSet.length === 1 && accused === imposterIdx;
+  const imposterName = getName(names, imposterIdx);
 
   return (
     <div className="pt-4 pb-10">
@@ -972,16 +1140,16 @@ function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, o
           THE IMPOSTER WAS
         </div>
         <div className="flex items-center gap-4">
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #f87171 0%, #f472b6 100%)" }}>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #f87171 0%, #f472b6 100%)" }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "3rem", lineHeight: 1, color: "#0c0a14" }}>
               {imposterIdx + 1}
             </div>
           </div>
-          <div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.8rem", lineHeight: 1 }}>
-              PLAYER {imposterIdx + 1}
+          <div className="min-w-0 flex-1">
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.8rem", lineHeight: 1.05, wordBreak: "break-word" }}>
+              {imposterName.toUpperCase()}
             </div>
-            <div className="text-stone-400 text-sm">drew the wrong word every round</div>
+            <div className="text-stone-400 text-sm mt-1">drew the wrong word every round</div>
           </div>
         </div>
       </div>
@@ -1020,8 +1188,8 @@ function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, o
             const isImp = i === imposterIdx;
             return (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-10 text-center" style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.3rem" }}>
-                  P{i + 1}
+                <div className="w-24 text-left truncate" style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.1rem" }}>
+                  {getName(names, i).toUpperCase()}
                 </div>
                 <div className="flex-1 h-7 bg-white/5 rounded-full overflow-hidden relative">
                   <div
@@ -1034,7 +1202,7 @@ function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, o
                     }}
                   />
                 </div>
-                <div className="w-8 text-right text-sm text-stone-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <div className="w-6 text-right text-sm text-stone-400" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   {count}
                 </div>
                 {isImp && <span className="text-xs text-red-400">⚠</span>}
@@ -1070,8 +1238,8 @@ function ResultsScreen({ votes, imposterIdx, playerCount, topics, allDrawings, o
                     .map((d) => (
                       <div key={d.player} className={`rounded-lg overflow-hidden border ${d.player === imposterIdx ? "border-red-400" : "border-white/10"} relative`}>
                         <img src={d.dataUrl} alt="" className="w-full block" style={{ aspectRatio: "1 / 1" }} />
-                        <div className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${d.player === imposterIdx ? "bg-red-500 text-white" : "bg-black/60 text-white"}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                          P{d.player + 1}
+                        <div className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-bold max-w-[calc(100%-8px)] truncate ${d.player === imposterIdx ? "bg-red-500 text-white" : "bg-black/60 text-white"}`} style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                          {getName(names, d.player).toUpperCase()}
                         </div>
                       </div>
                     ))}
