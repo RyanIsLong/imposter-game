@@ -42,7 +42,7 @@ const PHASES = {
   RESULTS: "results",
 };
 
-const DRAW_SECONDS = [15, 10, 5, 3];
+const DRAW_SECONDS = [30, 15, 10, 5];
 const HANDOFF_SECONDS = 4;
 const DISCUSSION_SECONDS = 60;
 const TOTAL_ROUNDS = 4;
@@ -95,6 +95,143 @@ function playFinalBeep() {
   osc.stop(now + 0.4);
 }
 
+// ─── LOBBY MUSIC ──────────────────────────────────────────────────────────
+// Simple chiptune loop in A minor: bass ostinato + arpeggio
+// Notes are scheduled ahead of time using Web Audio's precise timing.
+let musicState = {
+  playing: false,
+  masterGain: null,
+  scheduledUntil: 0,
+  schedulerId: null,
+  beat: 0,
+};
+
+// Frequencies for notes (A minor scale)
+const NOTE = {
+  A2: 110,
+  C3: 130.81,
+  E3: 164.81,
+  G3: 196,
+  A3: 220,
+  C4: 261.63,
+  E4: 329.63,
+  G4: 392,
+  A4: 440,
+  B4: 493.88,
+  C5: 523.25,
+  E5: 659.25,
+};
+
+// Bass pattern (one note per beat, 8 beats per loop)
+const BASS_PATTERN = [
+  NOTE.A2, NOTE.A2, NOTE.E3, NOTE.A2,
+  NOTE.G3, NOTE.G3, NOTE.E3, NOTE.G3,
+];
+
+// Arpeggio (sixteenth notes — 4 per beat, 32 per loop)
+const ARP_PATTERN = [
+  NOTE.A4, NOTE.C5, NOTE.E5, NOTE.C5,
+  NOTE.A4, NOTE.C5, NOTE.E5, NOTE.C5,
+  NOTE.A4, NOTE.E4, NOTE.A4, NOTE.E4,
+  NOTE.A4, NOTE.E4, NOTE.A4, NOTE.E4,
+  NOTE.G4, NOTE.B4, NOTE.E5, NOTE.B4,
+  NOTE.G4, NOTE.B4, NOTE.E5, NOTE.B4,
+  NOTE.G4, NOTE.E4, NOTE.G4, NOTE.E4,
+  NOTE.G4, NOTE.E4, NOTE.G4, NOTE.E4,
+];
+
+const BPM = 110;
+const BEAT_LENGTH = 60 / BPM; // seconds per beat
+const LOOP_BEATS = 8;
+const SCHEDULE_AHEAD = 0.2; // schedule 200ms ahead
+
+function playNote(ctx, freq, startTime, duration, type, peak, destination) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(destination);
+  osc.type = type;
+  osc.frequency.value = freq;
+  // little envelope so notes don't click
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(peak, startTime + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+
+function scheduleMusic() {
+  const ctx = audioCtx;
+  if (!ctx || !musicState.playing) return;
+  const now = ctx.currentTime;
+  const dest = musicState.masterGain;
+
+  while (musicState.scheduledUntil < now + SCHEDULE_AHEAD) {
+    const beatTime = musicState.scheduledUntil;
+    const beatInLoop = musicState.beat % LOOP_BEATS;
+
+    // Bass note on every beat
+    playNote(ctx, BASS_PATTERN[beatInLoop], beatTime, BEAT_LENGTH * 0.9, "square", 0.18, dest);
+
+    // Arpeggio: 4 sixteenth notes per beat
+    for (let i = 0; i < 4; i++) {
+      const arpTime = beatTime + (i * BEAT_LENGTH) / 4;
+      const arpIdx = beatInLoop * 4 + i;
+      playNote(ctx, ARP_PATTERN[arpIdx], arpTime, (BEAT_LENGTH / 4) * 0.85, "triangle", 0.10, dest);
+    }
+
+    musicState.scheduledUntil += BEAT_LENGTH;
+    musicState.beat += 1;
+  }
+}
+
+function startLobbyMusic() {
+  if (musicState.playing) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  // master gain envelope (fade in)
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  master.gain.setValueAtTime(0, ctx.currentTime);
+  master.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.5);
+
+  musicState = {
+    playing: true,
+    masterGain: master,
+    scheduledUntil: ctx.currentTime + 0.05,
+    beat: 0,
+    schedulerId: null,
+  };
+
+  scheduleMusic();
+  musicState.schedulerId = setInterval(scheduleMusic, 50);
+}
+
+function stopLobbyMusic() {
+  if (!musicState.playing) return;
+  const ctx = audioCtx;
+  if (!ctx || !musicState.masterGain) {
+    musicState.playing = false;
+    return;
+  }
+
+  // fade out, then disconnect
+  const now = ctx.currentTime;
+  musicState.masterGain.gain.cancelScheduledValues(now);
+  musicState.masterGain.gain.setValueAtTime(musicState.masterGain.gain.value, now);
+  musicState.masterGain.gain.linearRampToValueAtTime(0, now + 0.4);
+
+  if (musicState.schedulerId) clearInterval(musicState.schedulerId);
+  musicState.playing = false;
+
+  // disconnect after fade
+  const oldGain = musicState.masterGain;
+  setTimeout(() => {
+    try { oldGain.disconnect(); } catch (e) {}
+  }, 500);
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 function getName(names, idx) {
   const n = names && names[idx];
@@ -115,6 +252,23 @@ export default function App() {
   const [votes, setVotes] = useState({});
   const [revealStep, setRevealStep] = useState("locked");
   const [showRevealCard, setShowRevealCard] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+
+  // Manage lobby music: play during SETUP and NAMES, stop everywhere else
+  useEffect(() => {
+    const isLobby = phase === PHASES.SETUP || phase === PHASES.NAMES;
+    if (isLobby && musicEnabled) {
+      startLobbyMusic();
+    } else {
+      stopLobbyMusic();
+    }
+    return () => stopLobbyMusic();
+  }, [phase, musicEnabled]);
+
+  function toggleMusic() {
+    // Calling this is itself a user gesture, so audio context unlocks here.
+    setMusicEnabled((m) => !m);
+  }
 
   function goToNames() {
     setNames(Array(playerCount).fill(""));
@@ -218,6 +372,8 @@ export default function App() {
     }
   }
 
+  const isLobby = phase === PHASES.SETUP || phase === PHASES.NAMES;
+
   return (
     <div className="min-h-screen w-full text-stone-100 relative overflow-hidden" style={{ fontFamily: "'DM Sans', system-ui, sans-serif", backgroundColor: "#0c0a14" }}>
       <div className="absolute inset-0 pointer-events-none">
@@ -226,6 +382,18 @@ export default function App() {
       </div>
 
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500;700&family=Press+Start+2P&display=swap" />
+
+      {/* Music toggle — only show in lobby phases */}
+      {isLobby && (
+        <button
+          onClick={toggleMusic}
+          className="fixed top-4 right-4 z-40 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/15 flex items-center justify-center transition active:scale-95"
+          aria-label={musicEnabled ? "Mute music" : "Unmute music"}
+          title={musicEnabled ? "Mute music" : "Unmute music"}
+        >
+          <span style={{ fontSize: "1.1rem" }}>{musicEnabled ? "🔊" : "🔇"}</span>
+        </button>
+      )}
 
       <div className="relative z-10 max-w-2xl mx-auto px-5 py-8">
         {phase === PHASES.SETUP && <SetupScreen playerCount={playerCount} setPlayerCount={setPlayerCount} startGame={goToNames} />}
