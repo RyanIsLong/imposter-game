@@ -227,7 +227,7 @@ export default function App() {
         <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")" }} />
       </div>
 
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500;700&family=Press+Start+2P&display=swap" />
 
       <div className="relative z-10 max-w-2xl mx-auto px-5 py-8">
         {phase === PHASES.SETUP && <SetupScreen playerCount={playerCount} setPlayerCount={setPlayerCount} startGame={startGame} />}
@@ -320,12 +320,19 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
         <div className="inline-block mb-3 px-3 py-1 border border-pink-400/40 rounded-full text-pink-300 text-xs tracking-[0.3em]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
           PASS · DRAW · DECEIVE
         </div>
-        <h1 className="leading-[0.85] tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(4rem, 15vw, 7rem)" }}>
+        <h1
+          className="leading-[1.1]"
+          style={{
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: "clamp(2rem, 9vw, 4rem)",
+            color: "#ffffff",
+            textShadow: "4px 4px 0 #c084fc, 8px 8px 0 #7c3aed",
+            letterSpacing: "0.02em",
+          }}
+        >
           THE
           <br />
-          <span className="italic" style={{ background: "linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-            IMPOSTER
-          </span>
+          <span style={{ color: "#fce7f3" }}>IMPOSTER</span>
         </h1>
         <p className="text-stone-400 mt-4 text-sm leading-relaxed max-w-sm mx-auto">
           One of you draws something <em>almost</em> right. The rest of you have to figure out who.
