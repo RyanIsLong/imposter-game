@@ -42,7 +42,7 @@ const PHASES = {
   RESULTS: "results",
 };
 
-const DRAW_SECONDS = [30, 15, 10, 5];
+const DRAW_SECONDS = [15, 12, 10, 5];
 const HANDOFF_SECONDS = 4;
 const DISCUSSION_SECONDS = 60;
 const TOTAL_ROUNDS = 4;
