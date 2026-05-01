@@ -570,6 +570,8 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
         </ol>
       </div>
 
+      <CreditsSection />
+
       <button
         onClick={startGame}
         className="w-full py-5 rounded-full text-black font-bold tracking-wider active:scale-[0.98] transition shadow-lg shadow-pink-500/30"
@@ -577,6 +579,92 @@ function SetupScreen({ playerCount, setPlayerCount, startGame }) {
       >
         BEGIN THE GAME →
       </button>
+    </div>
+  );
+}
+
+// ─── CREDITS ──────────────────────────────────────────────────────────────
+function CreditsSection() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="bg-white/[0.03] border border-white/10 rounded-3xl mb-8 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-6 hover:bg-white/[0.02] transition active:scale-[0.99]"
+      >
+        <div className="text-xs text-pink-300 tracking-[0.25em]" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          CREDITS
+        </div>
+        <div
+          className="w-6 h-6 flex items-center justify-center text-stone-400 transition-transform"
+          style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="px-6 pb-6 text-sm text-stone-300 space-y-5">
+          <div>
+            <div className="text-xs text-stone-500 tracking-[0.2em] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              THE TEAM
+            </div>
+            <ul className="space-y-2">
+              <li className="flex justify-between items-baseline gap-3">
+                <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.15rem", letterSpacing: "0.02em" }}>Ryan Luong</span>
+                <span className="text-xs text-stone-400 text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Programmer</span>
+              </li>
+              <li className="flex justify-between items-baseline gap-3">
+                <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.15rem", letterSpacing: "0.02em" }}>Earl Sanchez</span>
+                <span className="text-xs text-stone-400 text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Programmer</span>
+              </li>
+              <li className="flex justify-between items-baseline gap-3">
+                <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.15rem", letterSpacing: "0.02em" }}>Anthony Nguyen</span>
+                <span className="text-xs text-stone-400 text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Programmer</span>
+              </li>
+              <li className="flex justify-between items-baseline gap-3">
+                <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.15rem", letterSpacing: "0.02em" }}>Alexa Olmos</span>
+                <span className="text-xs text-stone-400 text-right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>Design / UI</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <div className="text-xs text-stone-500 tracking-[0.2em] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              TOOLS USED
+            </div>
+            <ul className="space-y-1.5 text-stone-300">
+              <li>React + Vite</li>
+              <li>Tailwind CSS</li>
+              <li>Web Audio API (chiptune & SFX)</li>
+              <li>HTML5 Canvas (drawing)</li>
+              <li>Vercel (deployment)</li>
+              <li>Built with Claude (Anthropic)</li>
+            </ul>
+          </div>
+
+          <div>
+            <div className="text-xs text-stone-500 tracking-[0.2em] mb-3" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              ASSETS
+            </div>
+            <ul className="space-y-1.5 text-stone-300">
+              <li>Bebas Neue — Google Fonts</li>
+              <li>Press Start 2P — Google Fonts</li>
+              <li>JetBrains Mono — Google Fonts</li>
+              <li>DM Sans — Google Fonts</li>
+              <li>Audio synthesized in code (no samples)</li>
+            </ul>
+          </div>
+
+          <div className="pt-3 border-t border-white/5 text-xs text-stone-500 text-center" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            v1.0 · Made with care
+          </div>
+        </div>
+      )}
     </div>
   );
 }
