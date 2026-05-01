@@ -14,7 +14,7 @@ const TOPIC_POOL = [
   ["Snow Globe", "Crystal Ball"],
   ["Boxing Gloves", "Oven Mitts"],
   ["Flute", "Clarinet"],
-  ["Snorkling Goggles", "VR Headset"],
+  ["Snorkeling Goggles", "VR Headset"],
   ["Honey", "Syrup"],
   ["Crying", "Sweating"],
   ["Circus", "Carnival"],
@@ -661,7 +661,7 @@ function CreditsSection() {
           </div>
 
           <div className="pt-3 border-t border-white/5 text-xs text-stone-500 text-center" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            v1.0 · Made with care
+            v1.0 — © 2026 Ryan Luong, Earl Sanchez, Anthony Nguyen, Alexa Olmos
           </div>
         </div>
       )}
